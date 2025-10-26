@@ -810,6 +810,21 @@ PAGE_RESULTS = Template(r"""
       </div>
     </section>
 
+        {% if candidate_count is defined %}
+        <section class="mt-4">
+            <div class="rounded-xl p-3 border border-white/30 bg-white/50 dark:bg-white/5 text-sm text-slate-700 dark:text-slate-300">
+                <strong>Backend counts:</strong>
+                <span class="ml-2">candidates: {{ candidate_count }}</span>
+                <span class="ml-4">validated: {{ validated_count }}</span>
+                {% if ai_used %}
+                    <span class="ml-4 text-xs text-emerald-600">AI validation enabled</span>
+                {% else %}
+                    <span class="ml-4 text-xs text-amber-700">AI validation disabled</span>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+
     {% if validated and validated|length > 0 %}
     <!-- main grid -->
     <section class="mt-8 grid lg:grid-cols-3 gap-6">
@@ -817,7 +832,7 @@ PAGE_RESULTS = Template(r"""
       <div class="lg:col-span-2">
         <div id="grid" class="grid gap-6 sm:grid-cols-2">
           {% for p in validated %}
-          <article data-card class="group rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 shadow-glass backdrop-blur-xl hover:shadow-xl transition transform-gpu hover:-translate-y-0.5 opacity-0 animate-rise"
+          <article data-card class="group rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 shadow-glass backdrop-blur-xl hover:shadow-xl transition transform-gpu hover:-translate-y-0.5 opacity-100"
                    style="animation-delay: {{ (loop.index0 * 60) }}ms"
                    data-name="{{ p['name']|e }}">
             <h3 class="text-base font-semibold leading-tight">{{ p['name'] }}</h3>
@@ -892,22 +907,42 @@ PAGE_RESULTS = Template(r"""
     </div>
       </aside>
     </section>
-    {% else %}
-    <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {% for i in range(6) %}
-      <div class="rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 shadow-glass backdrop-blur-xl animate-pulse">
-        <div class="h-4 w-3/4 rounded bg-slate-200/70 dark:bg-slate-700/40"></div>
-        <div class="mt-3 h-3 w-full rounded bg-slate-200/60 dark:bg-slate-700/30"></div>
-        <div class="mt-2 h-3 w-5/6 rounded bg-slate-200/60 dark:bg-slate-700/30"></div>
-        <div class="mt-5 flex gap-2">
-          <div class="h-6 w-20 rounded bg-slate-200/70 dark:bg-slate-700/40"></div>
-          <div class="h-6 w-20 rounded bg-slate-200/70 dark:bg-slate-700/40"></div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    <p class="mt-6 text-center text-slate-600 dark:text-slate-400">No products validated for this query — try broadening the query or increasing post/comment limits.</p>
-    {% endif %}
+        {% else %}
+            {% if candidate_count and candidate_preview %}
+                <section class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {% for p in candidate_preview %}
+                    <div class="rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 shadow-glass backdrop-blur-xl">
+                        <h3 class="text-base font-semibold leading-tight">{{ p.name }}</h3>
+                        <p class="mt-2 text-sm text-slate-700 dark:text-slate-300">Candidate score: {{ '%.2f'|format(p.score) }}</p>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            {% for u in p.urls %}
+                            <a href="{{ u }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-lg border border-slate-300/60 dark:border-slate-700/60 px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-white/70 dark:hover:bg-white/10 transition">
+                                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none"><path d="M14 3h7v7M21 3L10 14M21 14v7h-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                source
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </section>
+                <p class="mt-6 text-center text-slate-600 dark:text-slate-400">No products validated for this query — showing candidate phrases we found. Try broadening the query or increasing post/comment limits.</p>
+            {% else %}
+                <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {% for i in range(6) %}
+                    <div class="rounded-2xl border border-white/40 dark:border-white/10 bg-white/60 dark:bg-white/5 p-5 shadow-glass backdrop-blur-xl animate-pulse">
+                        <div class="h-4 w-3/4 rounded bg-slate-200/70 dark:bg-slate-700/40"></div>
+                        <div class="mt-3 h-3 w-full rounded bg-slate-200/60 dark:bg-slate-700/30"></div>
+                        <div class="mt-2 h-3 w-5/6 rounded bg-slate-200/60 dark:bg-slate-700/30"></div>
+                        <div class="mt-5 flex gap-2">
+                            <div class="h-6 w-20 rounded bg-slate-200/70 dark:bg-slate-700/40"></div>
+                            <div class="h-6 w-20 rounded bg-slate-200/70 dark:bg-slate-700/40"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                <p class="mt-6 text-center text-slate-600 dark:text-slate-400">No products validated for this query — try broadening the query or increasing post/comment limits.</p>
+            {% endif %}
+        {% endif %}
   </main>
 
   <!-- footer -->
@@ -971,7 +1006,23 @@ async def search(
         subs = subreddits or guess_subs(query)
         candidates = cached_candidates(query, subs, limit_posts, comments_per_post)
         ai_used = bool(ai and MISTRAL_API_KEY)
-        validated: List[Dict[str,Any]] = validate_with_mistral(query, candidates[:max(1, ai_max_items)]) if ai_used else []
+        if ai_used:
+            validated: List[Dict[str,Any]] = validate_with_mistral(query, candidates[:max(1, ai_max_items)])
+        else:
+            # If AI validation is disabled (no MISTRAL_API_KEY), show the top candidate phrases
+            validated = []
+            for r in (candidates or [])[:max(1, ai_max_items)]:
+                validated.append({
+                    "name": r.get("phrase") or r.get("phrase", ""),
+                    "score": r.get("score", 0.0),
+                    "summary": "",
+                    "pros": [],
+                    "cons": [],
+                    "confidence": 0.0,
+                    "urls": r.get("urls", [])[:3],
+                })
+        # Log counts for easier debugging when users report blank results
+        logging.info(f"/search: query={query!r} subs={subs!r} candidates={len(candidates) if candidates is not None else 0} ai_used={ai_used} validated={len(validated) if validated is not None else 0}")
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -984,7 +1035,33 @@ async def search(
             email = user.get("email") or (user.get("user_metadata") or {}).get("email")
     except Exception:
         email = None
-    return HTMLResponse(PAGE_RESULTS.render(q=query, q_enc=quote_plus(query), subs=subs, subs_enc=quote_plus(subs), validated=validated, ai_used=ai_used, user_email=email))
+    # expose counts to the template so the UI can display diagnostic info
+    candidate_count = len(candidates) if candidates is not None else 0
+    validated_count = len(validated) if validated is not None else 0
+    # Prepare a small preview of top candidate phrases for UI fallback when no validated products
+    candidate_preview = []
+    try:
+        if candidates:
+            for r in (candidates or [])[:12]:
+                candidate_preview.append({
+                    'name': r.get('phrase') or r.get('text') or r.get('phrase', ''),
+                    'score': r.get('score', 0.0),
+                    'urls': r.get('urls', [])[:3],
+                })
+    except Exception:
+        candidate_preview = []
+    return HTMLResponse(PAGE_RESULTS.render(
+        q=query,
+        q_enc=quote_plus(query),
+        subs=subs,
+        subs_enc=quote_plus(subs),
+        validated=validated,
+        ai_used=ai_used,
+        user_email=email,
+        candidate_count=candidate_count,
+        validated_count=validated_count,
+        candidate_preview=candidate_preview
+    ))
 
 # CSV = validated only
 @app.get("/download.csv")
@@ -1017,6 +1094,7 @@ async def download_csv(
 # Supabase token verification (call Supabase Auth)
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.getenv("NEXT_PUBLIC_SUPABASE_ANON_KEY", "")
+SUPABASE_OAUTH_PROVIDER = os.getenv("SUPABASE_OAUTH_PROVIDER", "").strip()
 USER_ENDPOINT = f"{SUPABASE_URL}/auth/v1/user" if SUPABASE_URL else None
 
 async def verify_token(req: Request):
@@ -1059,54 +1137,56 @@ async def verify_token(req: Request):
 # -----------------------
 # Supabase OAuth helpers
 # -----------------------
-SUPABASE_OAUTH_PROVIDER = os.getenv("SUPABASE_OAUTH_PROVIDER", "github")
 APP_BASE = os.getenv("APP_BASE_URL", f"http://localhost:{os.getenv('PORT','8083')}")
 CALLBACK_PATH = "/auth/callback"
 CALLBACK_URL = APP_BASE.rstrip("/") + CALLBACK_PATH
 
 
 @app.get("/auth/start")
-def auth_start():
-    """Redirect user to Supabase hosted OAuth authorize endpoint."""
+def auth_start(request: Request):
+    """Show a custom sign-in page with provider options."""
     if not SUPABASE_URL:
         return HTMLResponse("<p>Supabase not configured</p>", status_code=500)
-    provider = (SUPABASE_OAUTH_PROVIDER or "").strip()
+    
+    # Provider may be overridden per-request via ?provider=google
+    provider = (request.query_params.get('provider') or "").strip()
+    logging.info(f"/auth/start called, query_params={dict(request.query_params)}, derived provider='{provider}'")
     base = f"{SUPABASE_URL.rstrip('/')}/auth/v1/authorize"
     redirect_param = f"redirect_to={quote_plus(CALLBACK_URL)}"
 
-    # If the request includes ?hosted=1, force the hosted UI (ignore SUPABASE_OAUTH_PROVIDER).
-    # This is used by /auth/switch to allow picking a different account.
-    from fastapi import Request as _Request
-    try:
-        # try to read query param from the raw request context if available
-        # (FastAPI will supply request when decorating with it; to avoid changing
-        # the handler signature we inspect ASGI scope via starlette's context if present)
-        # Fallback: check environment variable HOSTED_SIGNIN_ALWAYS.
-        _force_hosted = False
-        # If the global environ var is set, honor it
-        if os.getenv("HOSTED_SIGNIN_ALWAYS", "").lower() in ("1", "true", "yes"):
-            _force_hosted = True
-    except Exception:
-        _force_hosted = False
-
-    # If provider is not explicitly set or is 'auto', or if forced hosted, redirect to the hosted UI (shows available providers).
-    # Also if the incoming request included ?hosted=1 we should force the hosted UI.
-    # We detect the query param from the raw QUERY_STRING env var in case FastAPI didn't pass Request.
-    try:
-        qs = os.environ.get('QUERY_STRING', '')
-        if 'hosted=1' in qs:
-            _force_hosted = True
-    except Exception:
-        pass
-
-    if _force_hosted or not provider or provider.lower() in ("auto", "none"):
+    # If the request explicitly asks for the hosted UI (e.g. /auth/start?hosted=1),
+    # redirect to Supabase hosted sign-in page which supports Email (Magic Link/OTP).
+    force_hosted = request.query_params.get('hosted') in ('1', 'true', 'yes') or os.getenv("HOSTED_SIGNIN_ALWAYS", "").lower() in ("1", "true", "yes")
+    if force_hosted:
         auth_url = f"{base}?{redirect_param}"
         return RedirectResponse(auth_url)
 
-    # If a specific provider is configured, preflight the provider URL server-side so we can
-    # detect an immediate 'Unsupported provider' response from Supabase and show a friendly page
-    # instead of forwarding the raw JSON error to the browser.
-    provider_url = f"{base}?provider={quote_plus(provider)}&{redirect_param}"
+    # If no provider specified, show our custom provider selection page
+    if not provider:
+        with open('auth_selection.html', 'r') as f:
+            return HTMLResponse(f.read())
+
+    # Normalize and guard provider values. Treat email as hosted UI (Supabase handles OTP/Magic Link).
+    prov = provider.lower()
+    if prov == 'email':
+        logging.info("Provider 'email' requested; redirecting to hosted UI for magic link/OTP flow")
+        auth_url = f"{base}?{redirect_param}"
+        return RedirectResponse(auth_url)
+
+    # Allowlist OAuth providers we support via direct provider redirect
+    allowed_oauth = {'google', 'github'}
+    if prov not in allowed_oauth:
+        logging.warning(f"Unsupported or unknown provider requested: '{provider}' -- redirecting to selection page")
+        # Show selection page rather than forwarding an empty/unsupported provider to Supabase
+        with open('auth_selection.html', 'r') as f:
+            return HTMLResponse(f.read())
+
+    # Build provider URL. For Google, add common params to force account selection and offline access.
+    provider_qs = f"provider={quote_plus(provider)}&{redirect_param}"
+    if provider.lower() == 'google':
+        provider_qs += '&prompt=select_account&access_type=offline&include_granted_scopes=true'
+    provider_url = f"{base}?{provider_qs}"
+    
     try:
         # Use a short timeout and avoid following redirects
         resp = requests.get(provider_url, timeout=5, allow_redirects=False)
@@ -1132,11 +1212,12 @@ def auth_start():
   <p>Options:</p>
   <ul>
     <li>Enable the provider in Supabase Dashboard → Authentication → Sign In / Providers, then retry.</li>
-    <li>Use the Supabase hosted sign-in UI which shows only enabled providers:</li>
+    <li>Go back to the sign in page to choose a different provider:</li>
   </ul>
-  <p style='margin-top:12px'><a href="{base}?{redirect_param}" style='display:inline-block;padding:10px 14px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none'>Open hosted sign-in UI</a>
-  &nbsp; <a href="{SUPABASE_URL.rstrip('/')}/project/auth" style='margin-left:12px;color:#444;text-decoration:underline'>Open Supabase Auth settings</a></p>
-  <p style='margin-top:16px;color:#666;font-size:13px'>If you want me to change the app to always use the hosted UI, unset SUPABASE_OAUTH_PROVIDER or set it to "auto".</p>
+  <p style='margin-top:12px'>
+    <a href="/auth/start" style='display:inline-block;padding:10px 14px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none'>Back to sign in</a>
+    <a href="{SUPABASE_URL.rstrip('/')}/project/auth" style='margin-left:12px;color:#444;text-decoration:underline'>Open Supabase Auth settings</a>
+  </p>
 </div>
 </body></html>
 """
@@ -1145,9 +1226,22 @@ def auth_start():
         return RedirectResponse(provider_url)
     except Exception as e:
         logging.warning(f"Preflight check of Supabase provider failed: {e}")
-        # Fallback to hosted UI
-        auth_url = f"{base}?{redirect_param}"
-        return RedirectResponse(auth_url)
+        # Show error and link back to provider selection
+        error_html = f"""
+<html><head><meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>
+<title>Sign-in error</title>
+<style>body{{font-family:system-ui,Roboto,-apple-system;padding:24px;color:#111}}.card{{max-width:760px;margin:36px auto;padding:20px;border-radius:12px;border:1px solid #eee}}</style>
+</head><body>
+<div class='card'>
+  <h2>Unable to connect to authentication service</h2>
+  <p>There was a problem connecting to the authentication service. Please try again.</p>
+  <p style='margin-top:12px'>
+    <a href="/auth/start" style='display:inline-block;padding:10px 14px;border-radius:8px;background:#2563eb;color:#fff;text-decoration:none'>Back to sign in</a>
+  </p>
+</div>
+</body></html>
+"""
+        return HTMLResponse(error_html, status_code=500)
 
 
 @app.get('/auth/debug')
@@ -1172,6 +1266,41 @@ def auth_debug(request: Request):
         'provider_env': provider,
         'hosted_ui': hosted_url,
     })
+
+
+@app.get('/status')
+def status(request: Request):
+    """Return a quick status of configured services (safe — no secrets returned).
+
+    Optional query param: test_candidates=1 will run a quick candidate extraction for
+    'best shampoo' (may make network calls to Reddit and can be slow). Use only for debugging.
+    """
+    info = {
+        'mistral_configured': bool(MISTRAL_API_KEY),
+        'mistral_model': MISTRAL_MODEL or None,
+        'supabase_configured': bool(SUPABASE_URL and SUPABASE_ANON_KEY),
+        'supabase_url': SUPABASE_URL or None,
+        'reddit_client_id_present': bool(os.getenv('REDDIT_CLIENT_ID')),
+        'reddit_client_secret_present': bool(os.getenv('REDDIT_CLIENT_SECRET')),
+        'praw_installed': None,
+    }
+    try:
+        import praw  # type: ignore
+        info['praw_installed'] = True
+    except Exception:
+        info['praw_installed'] = False
+
+    # If requested, run a small candidate extraction to see if we get any candidates.
+    if request.query_params.get('test_candidates') in ('1', 'true', 'yes'):
+        try:
+            # Use a small sample to avoid long waits
+            cand = cached_candidates('best shampoo', guess_subs('best shampoo'), 20, 4)
+            info['candidates_count'] = len(cand)
+            info['candidates_sample'] = [ { 'phrase': c.get('phrase'), 'score': c.get('score') } for c in cand[:6] ]
+        except Exception as e:
+            info['candidates_error'] = str(e)
+
+    return JSONResponse(info)
 
 
 @app.get("/auth/callback", response_class=HTMLResponse)
