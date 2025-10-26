@@ -25,7 +25,6 @@ from fastapi import FastAPI, Query, Request, Depends, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from jinja2 import Template
-import jwt
 import httpx
 from fastapi.responses import RedirectResponse
 
