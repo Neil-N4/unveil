@@ -1724,8 +1724,13 @@ async def auth_session(request: Request):
         logging.warning(f"Supabase session set: invalid token {resp.status_code} {resp.text}")
         raise HTTPException(401, "Invalid token")
 
-    # Set cookie (HttpOnly). Use Secure only if APP_BASE is https.
-    secure = APP_BASE.lower().startswith('https')
+    # Set cookie (HttpOnly). Determine Secure from request (works behind proxies like Vercel)
+    try:
+        proto = (request.headers.get('x-forwarded-proto') or request.url.scheme or 'https').split(',')[0].strip()
+        secure = proto == 'https'
+    except Exception:
+        secure = APP_BASE.lower().startswith('https')
+    logging.info(f"/auth/session: setting cookie secure={secure}, scheme={request.url.scheme}, xfp={request.headers.get('x-forwarded-proto')}")
     resp = RedirectResponse(url='/', status_code=302)
     # Cookie expires in 14 days
     max_age = 14 * 24 * 60 * 60
