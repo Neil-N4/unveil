@@ -1678,14 +1678,20 @@ def auth_callback():
       <button id="cont">Continue</button>
       <pre id="msg" style="margin-top:12px;color:#666"></pre>
     </div>
-    <script>
-      function report(s){document.getElementById('msg').innerText=s}
-      function sendToken(token){
-        fetch('/auth/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({access_token:token})})
-          .then(r=>{ if(r.redirected) window.location = r.url; else return r.text() })
-          .then(t=>{ if(t) report(t) })
-          .catch(e=>report('Error: '+e))
-      }
+        <script>
+            function report(s){document.getElementById('msg').innerText=s}
+            function sendToken(token){
+                fetch('/auth/session',{
+                        method:'POST',
+                        headers:{'Content-Type':'application/json'},
+                        credentials:'include',
+                        redirect:'follow',
+                        body:JSON.stringify({access_token:token})
+                })
+                    .then(r=>{ if(r.redirected) { window.location = r.url; return ''; } else { return r.text(); } })
+                    .then(t=>{ if(t) report(t) })
+                    .catch(e=>report('Error: '+e))
+            }
       const hash = location.hash || '';
       const params = new URLSearchParams(hash.replace(/^#/, ''));
       const token = params.get('access_token') || params.get('token') || '';
@@ -1734,7 +1740,7 @@ async def auth_session(request: Request):
     resp = RedirectResponse(url='/', status_code=302)
     # Cookie expires in 14 days
     max_age = 14 * 24 * 60 * 60
-    resp.set_cookie(key='supabase_token', value=token, httponly=True, secure=secure, samesite='lax', max_age=max_age)
+    resp.set_cookie(key='supabase_token', value=token, httponly=True, secure=secure, samesite='lax', max_age=max_age, path='/')
     return resp
 
 
