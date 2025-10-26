@@ -9,7 +9,7 @@ Consensus Search Engine (FastAPI)
 """
 
 from __future__ import annotations
-import os, re, sys, math, html, json, time, logging
+import os, re, sys, math, html, json, time, logging, base64
 from typing import Dict, Any, List, Tuple, Optional
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,7 +26,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from jinja2 import Template
 import httpx
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, Response
 
 
 # ---------------------------------------------------
@@ -1299,6 +1299,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Tiny transparent 1x1 PNG as default favicon to avoid 404s in logs
+_FAVICON_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="
+
+@app.get("/favicon.png")
+def favicon_png():
+    return Response(base64.b64decode(_FAVICON_PNG_B64), media_type="image/png")
+
+@app.get("/favicon.ico")
+def favicon_ico():
+    # Many browsers accept PNG bytes for .ico; serve same content with x-icon mime
+    return Response(base64.b64decode(_FAVICON_PNG_B64), media_type="image/x-icon")
 
 async def get_optional_user(req: Request):
     try:
