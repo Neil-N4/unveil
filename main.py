@@ -1488,7 +1488,12 @@ def auth_start(request: Request):
     provider = (request.query_params.get('provider') or "").strip()
     logging.info(f"/auth/start called, query_params={dict(request.query_params)}, derived provider='{provider}'")
     base = f"{SUPABASE_URL.rstrip('/')}/auth/v1/authorize"
-    redirect_param = f"redirect_to={quote_plus(CALLBACK_URL)}"
+    # Build callback URL from the current request origin to avoid localhost in production
+    try:
+        callback_url = str(request.url_for('auth_callback'))
+    except Exception:
+        callback_url = CALLBACK_URL  # fallback to env-based
+    redirect_param = f"redirect_to={quote_plus(callback_url)}"
 
     # If the request explicitly asks for the hosted UI (e.g. /auth/start?hosted=1),
     # redirect to Supabase hosted sign-in page which supports Email (Magic Link/OTP).
@@ -1594,7 +1599,11 @@ def auth_debug(request: Request):
     cookie = request.cookies.get('supabase_token')
     provider = (SUPABASE_OAUTH_PROVIDER or '').strip()
     base = f"{SUPABASE_URL.rstrip('/')}/auth/v1/authorize" if SUPABASE_URL else None
-    redirect_param = f"redirect_to={quote_plus(CALLBACK_URL)}" if CALLBACK_URL else None
+    try:
+        cb = str(request.url_for('auth_callback'))
+    except Exception:
+        cb = CALLBACK_URL
+    redirect_param = f"redirect_to={quote_plus(cb)}" if cb else None
     hosted_url = f"{base}?{redirect_param}" if base and redirect_param else None
     return JSONResponse({
         'cookie_present': bool(cookie),
