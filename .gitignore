@@ -16,6 +16,3 @@ server/venv/
 server/__pycache__/
 server/.pytest_cache/
 *.log
-
-__pycache__/
-*.pyc
