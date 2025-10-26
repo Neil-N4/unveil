@@ -1478,6 +1478,20 @@ CALLBACK_PATH = "/auth/callback"
 CALLBACK_URL = APP_BASE.rstrip("/") + CALLBACK_PATH
 
 
+def _external_origin(request: Request) -> Optional[str]:
+    """Best-effort to compute the public origin behind proxies (Vercel/Netlify).
+    Prefers X-Forwarded-* headers, falls back to request.url.
+    """
+    try:
+        proto = (request.headers.get('x-forwarded-proto') or request.url.scheme or 'https').split(',')[0].strip()
+        host = (request.headers.get('x-forwarded-host') or request.headers.get('host') or request.url.netloc).split(',')[0].strip()
+        if host:
+            return f"{proto}://{host}"
+    except Exception:
+        pass
+    return None
+
+
 @app.get("/auth/start")
 def auth_start(request: Request):
     """Show a custom sign-in page with provider options."""
@@ -1488,11 +1502,9 @@ def auth_start(request: Request):
     provider = (request.query_params.get('provider') or "").strip()
     logging.info(f"/auth/start called, query_params={dict(request.query_params)}, derived provider='{provider}'")
     base = f"{SUPABASE_URL.rstrip('/')}/auth/v1/authorize"
-    # Build callback URL from the current request origin to avoid localhost in production
-    try:
-        callback_url = str(request.url_for('auth_callback'))
-    except Exception:
-        callback_url = CALLBACK_URL  # fallback to env-based
+    # Build callback URL from forwarded origin or url_for as a fallback
+    origin = _external_origin(request)
+    callback_url = f"{origin}{CALLBACK_PATH}" if origin else str(request.url_for('auth_callback'))
     redirect_param = f"redirect_to={quote_plus(callback_url)}"
 
     # If the request explicitly asks for the hosted UI (e.g. /auth/start?hosted=1),
@@ -1599,10 +1611,8 @@ def auth_debug(request: Request):
     cookie = request.cookies.get('supabase_token')
     provider = (SUPABASE_OAUTH_PROVIDER or '').strip()
     base = f"{SUPABASE_URL.rstrip('/')}/auth/v1/authorize" if SUPABASE_URL else None
-    try:
-        cb = str(request.url_for('auth_callback'))
-    except Exception:
-        cb = CALLBACK_URL
+    origin = _external_origin(request)
+    cb = f"{origin}{CALLBACK_PATH}" if origin else (str(request.url_for('auth_callback')) if SUPABASE_URL else CALLBACK_URL)
     redirect_param = f"redirect_to={quote_plus(cb)}" if cb else None
     hosted_url = f"{base}?{redirect_param}" if base and redirect_param else None
     return JSONResponse({
