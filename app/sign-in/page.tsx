@@ -1,9 +1,9 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
-export default function SignIn() {
+function SignInForm() {
   const supabase = createClient()
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
@@ -29,9 +29,17 @@ export default function SignIn() {
         <>
           <input className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2"
                  placeholder="you@site.com" value={email} onChange={e=>setEmail(e.target.value)} />
-          <button onClick={sendMagic} className="w-full rounded-xl bg-indigo-600 text-white py-2">Send magic link</button>
+          <button onClick={sendMagic} className="w-full rounded-xl bg-black text-white py-2">Send magic link</button>
         </>
       )}
     </div>
+  )
+}
+
+export default function SignIn() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-sm p-6">Loading...</div>}>
+      <SignInForm />
+    </Suspense>
   )
 }
